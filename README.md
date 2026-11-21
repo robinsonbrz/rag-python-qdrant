@@ -268,3 +268,26 @@ No Docker, troque `uv run python` por `docker compose run --rm app python`.
 - Banco vetorial: [Qdrant](https://qdrant.tech/)
 - Modelo de chat: DeepSeek Flash via [OpenCode Zen](https://opencode.ai/)
 - Orquestração: [LangChain](https://python.langchain.com/)
+
+---
+
+## 🔐 Aviso de segurança e escopo
+
+Este repositório é um **projeto de estudos e testes locais**, não um sistema pronto para produção. O foco atual é demonstrar o fluxo de RAG (ingestão, busca vetorial e geração de respostas), e não oferecer isolamento, autenticação ou proteção contra uso malicioso.
+
+**Não exponha a aplicação (porta 5000) nem o Qdrant (portas 6333/6334) diretamente à internet.** Use apenas em máquina local ou rede confiável.
+
+A segurança deve ser ampliada em versões futuras, incluindo pelo menos:
+
+- **Autenticação e autorização** na interface Flask, com rate limit e cota de uso da API.
+- **Sanitização da saída Markdown** antes de renderizar HTML, além de CSP e headers de segurança, para prevenir XSS.
+- **Limites de upload** (tamanho, páginas e tipo real do arquivo) e controle de disco.
+- **Qdrant protegido**: sem publicação de portas, com API key e/ou TLS quando necessário.
+- **Bind em loopback por padrão** para Flask e Qdrant, liberando acesso externo apenas de forma explícita.
+- **Proteção CSRF** nos formulários e mensagens de erro genéricas, sem detalhes internos.
+- **Gestão de segredos**: `.env` com permissão `600`, `FLASK_SECRET_KEY` obrigatória e chave da API nunca versionada.
+- **Builds reprodutíveis**: `uv.lock`, `uv sync --frozen` e imagens Docker fixadas por digest.
+- **Hardening dos contêineres**: usuário non-root, `no-new-privileges`, `cap_drop` e limites de CPU/memória.
+- **Definição de confidencialidade**: os embeddings são locais, mas os trechos recuperados são enviados à API de chat. Evite ingerir documentos sensíveis ou use um modelo local.
+
+Contribuições que melhorem esses pontos são bem-vindas.
