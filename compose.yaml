@@ -4,6 +4,11 @@
 #   2) app    : aplicação Python (interface web + RAG)
 # ============================================================
 
+# Mantém o nome do projeto Docker mesmo após renomear a pasta para
+# "rag-python-qdrant". Assim os containers e volumes existentes
+# (Qdrant, cache do Hugging Face) continuam sendo reaproveitados.
+name: rag_python_qdrant
+
 services:
   # ----------------------------------------------------------------
   # QDRANT — banco vetorial que guarda os "pedaços" dos PDFs já
