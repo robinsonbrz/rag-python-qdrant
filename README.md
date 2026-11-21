@@ -2,7 +2,7 @@
 
 Sistema **RAG (Retrieval-Augmented Generation)** para uso local: você envia PDFs, o sistema transforma o conteúdo em vetores semânticos com o modelo `intfloat/multilingual-e5-large`, armazena no **Qdrant** e responde perguntas usando **apenas o conteúdo recuperado** — sem inventar respostas fora do material.
 
-A interface web é feita em **Flask**. O "motor de resposta" é o **DeepSeek Flash** via OpenCode (API compatível com OpenAI), consumido online por uma chave de API.
+A interface web é feita em **Flask**. O "motor de resposta" é o **DeepSeek Flash** via **OpenCode Zen** (API compatível com OpenAI), consumido online por uma chave de API.
 
 ---
 
@@ -10,59 +10,21 @@ A interface web é feita em **Flask**. O "motor de resposta" é o **DeepSeek Fla
 
 - **Ingestão de PDFs**: envie um ou mais PDFs pela interface.
 - **Busca semântica**: encontra trechos pelo *significado*, não só por palavras exatas.
-- **Respostas ancoradas no material**: o modelo usa os trechos recuperados como contexto.
-- **Trava anti-alucinação**: se o contexto não contém a resposta, o sistema avisa em vez de chutar.
+- **Respostas ancoradas no material**: o modelo usa os trechos recuperados como contexto e avisa quando a resposta não está no material.
 - **Prefixos E5 corretos**: ingestão usa `passage: ` e consulta usa `query: `, conforme exige o modelo.
-- **Recuperação com `k=8`**: mais trechos no contexto para melhorar a chance de acertar.
+- **Recuperação configurável**: `TOP_K=8` por padrão.
 - **Modelo de embeddings 100% local**: não consome créditos da API de chat.
 
 ---
 
-## 🧠 Fluxo geral (como tudo se encaixa)
-
-### 1. Ingestão de um PDF
+## 🧠 Como funciona
 
 ```
-PDF enviado pela interface
-        │
-        ▼
-Flask recebe o arquivo
-        │
-        ▼
-LangChain lê e divide o texto em chunks
-        │
-        ▼
-Cada chunk é prefixado com "passage: "
-        │
-        ▼
-Sentence-Transformers + PyTorch geram os embeddings (texto → números)
-        │
-        ▼
-Qdrant armazena os vetores
-```
+PDF → Flask → LangChain divide em chunks → prefixo "passage: "
+    → embeddings locais → Qdrant
 
-### 2. Consulta (pergunta do usuário)
-
-```
-Pergunta digitada na interface
-        │
-        ▼
-Flask recebe a pergunta
-        │
-        ▼
-A pergunta é prefixada com "query: "
-        │
-        ▼
-Qdrant busca os "k" trechos mais parecidos (k=8)
-        │
-        ▼
-LangChain monta o contexto com esses trechos
-        │
-        ▼
-DeepSeek Flash responde usando só o contexto
-        │
-        ▼
-Flask exibe a resposta na tela
+Pergunta → prefixo "query: " → Qdrant busca os TOP_K trechos mais parecidos
+         → LangChain monta o contexto → DeepSeek Flash responde
 ```
 
 > 💡 **Por que os prefixos são obrigatórios?**
@@ -74,15 +36,16 @@ Flask exibe a resposta na tela
 
 | Componente | O que faz neste projeto |
 |---|---|
-| **Flask** | Interface web e API HTTP. Recebe PDFs, exibe a página, envia perguntas e mostra respostas. |
-| **LangChain** | Camada de orquestração. Lê PDFs, divide em pedaços, gerencia o fluxo de recuperação e monta o prompt enviado ao modelo. |
-| **Qdrant** | Banco de dados vetorial. Guarda os embeddings e faz busca por similaridade (semelhança semântica). |
-| **Sentence-Transformers** | Carrega o modelo de embeddings (`multilingual-e5-large`) e transforma texto em vetores numéricos. |
-| **PyTorch** | Motor matemático usado pelo Sentence-Transformers para rodar o modelo de embeddings em CPU/GPU. |
-| **DeepSeek Flash (OpenCode)** | Modelo de linguagem que **escreve a resposta final** com base no contexto recuperado. Roda via API online e usa a chave configurada. |
-| **python-dotenv** | Carrega as variáveis do arquivo `.env` para dentro da aplicação. |
-| **pypdf / pymupdf** | Bibliotecas de extração de texto dos PDFs. |
-| **Docker / Docker Compose (opcional)** | Facilita subir a aplicação e o Qdrant juntos, sem instalar tudo manualmente. |
+| **Flask** | Interface web e rotas HTTP: recebe PDFs, envia perguntas e exibe respostas. |
+| **LangChain** | Lê PDFs, divide em chunks, monta o contexto e o prompt enviado ao modelo. |
+| **Qdrant** | Banco de dados vetorial: guarda os embeddings e faz busca por similaridade. |
+| **Sentence-Transformers / Hugging Face** | Carrega o modelo de embeddings e transforma texto em vetores. |
+| **PyTorch** | Motor matemático usado pelo modelo de embeddings em CPU. |
+| **DeepSeek Flash (OpenCode Zen)** | Modelo de linguagem que escreve a resposta final com base no contexto. |
+| **pypdf** | Extração de texto dos PDFs via `PyPDFLoader`. |
+| **python-dotenv** | Carrega as variáveis do arquivo `.env`. |
+| **uv** | Gerencia as dependências Python (dentro e fora do Docker). |
+| **Docker / Docker Compose** | Sobe a aplicação e o Qdrant juntos, sem instalação manual. |
 
 ---
 
@@ -90,72 +53,70 @@ Flask exibe a resposta na tela
 
 ### Opção A — Docker (recomendado)
 
-- **Docker** instalado
-- **Docker Compose** instalado
-- Conexão com a internet:
-  - para baixar as imagens
-  - para usar a API do DeepSeek Flash
-  - **no primeiro uso**, para baixar o modelo de embeddings (arquivo grande, pode demorar)
+- **Docker** e **Docker Compose** instalados.
+- Conexão com a internet para baixar as imagens, usar a API do chat e, no primeiro uso, baixar o modelo de embeddings.
 
 ### Opção B — Execução local (sem Docker)
 
-- **Python 3.10+**
-- **Qdrant** rodando localmente (via Docker individual ou binário)
-- Conexão com a internet (mesmos motivos acima)
-- **4 GB de RAM no mínimo** — **8 GB recomendado** (o modelo de embeddings + PyTorch consomem bastante memória)
+- **Python 3.12+** e **uv**.
+- **Qdrant** rodando localmente (via Docker ou binário).
+- Conexão com a internet pelos mesmos motivos acima.
+- **4 GB de RAM no mínimo** — **8 GB recomendado** (o modelo de embeddings + PyTorch consomem bastante memória).
 
 ---
 
-## 📁 Estrutura esperada do projeto
-
-> Os nomes abaixo são ilustrativos. Ajuste conforme a estrutura real do seu repositório.
+## 📁 Estrutura do projeto
 
 ```
 .
-├── app.py                 # aplicação Flask e rotas
-├── ingest.py              # lógica de ingestão de PDFs
-├── query.py               # lógica de recuperação e resposta
-├── requirements.txt       # dependências Python
+├── app/
+│   ├── main.py            # aplicação Flask e rotas
+│   ├── config.py          # leitura das variáveis de ambiente
+│   ├── ingest.py          # extração, chunking e gravação no Qdrant
+│   ├── query.py           # recuperação e resposta com o modelo de chat
+│   ├── vector_store.py    # conexão com o Qdrant e modelo de embeddings
+│   ├── reingest.py        # recria a coleção e reingere todos os PDFs
+│   └── templates/         # template HTML da interface
+├── data/pdfs/             # PDFs enviados pela interface
+├── pyproject.toml         # dependências Python
 ├── .env.example           # modelo de variáveis de ambiente
 ├── .env                   # variáveis reais (NÃO versionar)
-├── docker-compose.yml     # sobe app + Qdrant
-├── Dockerfile             # imagem da aplicação
-├── static/                # CSS/JS da interface
-└── templates/             # templates HTML da interface
+├── compose.yaml           # sobe app + Qdrant
+└── Dockerfile             # imagem da aplicação
 ```
 
 ---
 
 ## ⚙️ Variáveis de ambiente
 
-Crie um arquivo `.env` na raiz do projeto. Exemplo:
+Crie um arquivo `.env` na raiz do projeto a partir de `.env.example`:
 
 ```env
+# Modelo de chat (OpenCode Zen)
+OPENCODE_BASE_URL=https://opencode.ai/zen/v1
+OPENCODE_MODEL=deepseek-v4.1-flash
+OPENCODE_API_KEY=sua-chave-aqui
+
 # Modelo de embeddings (local)
 EMBEDDING_MODEL=intfloat/multilingual-e5-large
 
-# API do modelo de chat (DeepSeek Flash via OpenCode)
-OPENCODE_BASE_URL=https://sua-instancia.openCode...
-OPENCODE_API_KEY=sua-chave-aqui
-
 # Qdrant
 QDRANT_URL=http://localhost:6333
-QDRANT_COLLECTION=rag_docs
+QDRANT_COLLECTION=estudos
 
-# Flask
-PORT=5000
+# Busca
+TOP_K=8
 ```
+
+Variáveis opcionais: `QDRANT_API_KEY`, `CHUNK_SIZE` (padrão `1000`), `CHUNK_OVERLAP` (padrão `200`) e `FLASK_SECRET_KEY`.
 
 > ⚠️ **Atenção**
 > - Não deixe `OPENCODE_API_KEY` exposta em repositório público.
-> - Use `QDRANT_URL=http://qdrant:6333` quando a aplicação rodar dentro do Docker Compose (o nome do serviço substitui `localhost`).
-> - Se usar **fora do Docker**, mantenha `QDRANT_URL=http://localhost:6333`.
+> - No Docker Compose, `QDRANT_URL` é sobrescrito para `http://qdrant:6333`; fora do Docker, use `http://localhost:6333`.
 
 ---
 
 ## 🚀 Instalação e execução
-
-> Nesta versão **não existe script `.sh`**. Todos os passos são executados manualmente, como descrito abaixo.
 
 ### Opção A — Com Docker Compose (recomendado)
 
@@ -163,17 +124,15 @@ PORT=5000
 
    ```bash
    git clone <url-do-repositorio>
-   cd nome-do-projeto
+   cd rag-python-qdrant
    ```
 
-2. **Crie o arquivo `.env`**
+2. **Crie o `.env` e preencha a chave da OpenCode Zen**
 
    ```bash
    cp .env.example .env
    nano .env
    ```
-
-   Preencha com a chave da OpenCode e ajuste o nome da coleção, se necessário.
 
 3. **Suba os serviços**
 
@@ -181,141 +140,72 @@ PORT=5000
    docker compose up --build
    ```
 
-   Na primeira execução:
-   - a imagem da aplicação será construída;
-   - o modelo de embeddings será baixado (pode demorar alguns minutos);
-   - o Qdrant será iniciado junto.
+   Na primeira execução, a imagem é construída, o modelo de embeddings é baixado (pode demorar alguns minutos) e o Qdrant é iniciado.
 
-4. **Acesse a interface**
-
-   Abra no navegador:
-
-   ```
-   http://localhost:5000
-   ```
+4. **Acesse** [http://localhost:5000](http://localhost:5000).
 
 5. **Para parar**
 
    ```bash
-   Ctrl+C
-   ```
-
-   Ou, em segundo plano:
-
-   ```bash
-   docker compose up --build -d
    docker compose down
    ```
 
-### Opção B — Sem Docker (ou apenas Qdrant separado)
+   Para rodar em segundo plano, use `docker compose up --build -d`.
 
-1. **Subir o Qdrant individualmente** (se ainda não estiver rodando):
+### Opção B — Sem Docker (ou apenas o Qdrant separado)
 
-   ```bash
-   docker run -d -p 6333:6333 \
-     -v qdrant_data:/qdrant/storage \
-     qdrant/qdrant
-   ```
-
-2. **Criar o ambiente Python**
+1. **Suba o Qdrant** (se ainda não estiver rodando):
 
    ```bash
-   python -m venv venv
-   source venv/bin/activate        # Linux/macOS
-   # venv\Scripts\activate         # Windows
+   docker compose up -d qdrant
    ```
 
-3. **Instalar as dependências**
+2. **Instale as dependências** com o uv:
 
    ```bash
-   pip install -r requirements.txt
+   uv sync
    ```
 
-4. **Configurar o `.env`**
+3. **Configure o `.env`**:
 
    ```bash
    cp .env.example .env
    nano .env
    ```
 
-   Aqui o Qdrant deve apontar para `http://localhost:6333`.
+   Mantenha `QDRANT_URL=http://localhost:6333`.
 
-5. **Executar a aplicação**
+4. **Execute a aplicação**:
 
    ```bash
-   python app.py
+   uv run python -m app.main
    ```
 
-6. **Acessar**
-
-   ```
-   http://localhost:5000
-   ```
+5. **Acesse** [http://localhost:5000](http://localhost:5000).
 
 ---
 
 ## 🖥️ Utilização da interface Flask
 
-A interface web é simples e tem dois fluxos principais:
-
 ### 1. Upload/ingestão de PDF
 
-1. Clique no botão de **upload** ou selecione o arquivo PDF.
-2. Escolha um ou mais arquivos `.pdf`.
-3. Envie.
+1. Selecione um ou mais arquivos `.pdf`.
+2. Envie.
 
-O que acontece nos bastidores:
-
-- O Flask recebe o arquivo;
-- o LangChain lê e divide o PDF em **chunks** (pedaços de texto);
-- cada chunk recebe o prefixo `passage: `;
-- o modelo de embeddings transforma cada chunk em vetor;
-- o Qdrant armazena esses vetores na coleção configurada.
+O PDF é salvo em `data/pdfs/` e seus trechos são gravados na coleção configurada.
 
 ### 2. Pergunta ao sistema
 
-1. Digite a pergunta no campo de texto.
-2. Clique em **Perguntar** ou envie o formulário.
+1. Digite a pergunta e clique em **Perguntar**.
+2. Marque **referências** se quiser ver arquivo e página de cada trecho usado.
 
-Bastidores:
-
-- a pergunta recebe o prefixo `query: `;
-- o Qdrant recupera os **8 trechos mais relevantes**;
-- o LangChain monta o contexto;
-- o DeepSeek Flash responde usando **apenas** esse contexto;
-- a resposta aparece na tela.
-
----
-
-## 🔁 Recriação da coleção e reingestão
-
-> **Importante ao trocar de modelo de embeddings.**
-> Vetores gerados com um modelo **não são compatíveis** com vetores de outro modelo.
-
-Se você alterou `EMBEDDING_MODEL`, **limpe a coleção existente e reenvie todos os PDFs**.
-
-### Como limpar a coleção
-
-Substitua `NOME_DA_COLECAO` pelo valor real do seu `.env`:
-
-```bash
-docker compose run --rm app python -c "
-from qdrant_client import QdrantClient
-import os
-
-client = QdrantClient(url=os.getenv('QDRANT_URL', 'http://localhost:6333'))
-client.delete_collection(collection_name='NOME_DA_COLECAO')
-print('Coleção removida. Reenvie os PDFs pela interface.')
-"
-```
-
-Depois, volte na interface e **reenvie todos os PDFs** novamente.
+O sistema recupera os `TOP_K` trechos mais relevantes, monta o contexto e exibe a resposta em Markdown.
 
 ---
 
 ## 🧪 Teste de validação
 
-Depois de configurar e reingerir, faça este teste:
+Depois de ingerir o material, faça este teste:
 
 **Pergunta:**
 
@@ -328,10 +218,9 @@ Depois de configurar e reingerir, faça este teste:
 
 Se a resposta reclamar que a fórmula não está no contexto, verifique:
 
-1. Se o modelo E5 está de fato ativo no `.env`.
+1. Se o modelo E5 está ativo no `.env`.
 2. Se os prefixos `passage: ` e `query: ` estão sendo aplicados.
-3. Se `k` está em **8**.
-4. Se a coleção foi realmente recriada após a troca de modelo.
+3. Se `TOP_K` está em **8**.
 
 ---
 
@@ -340,39 +229,36 @@ Se a resposta reclamar que a fórmula não está no contexto, verifique:
 | Sintoma | Causa provável | Correção |
 |---|---|---|
 | Erro de chave da OpenCode | `OPENCODE_API_KEY` ausente no `.env` | Confira o `.env` e reinicie a aplicação |
-| Resposta "não encontrei no contexto" | `k` baixo, prefixos ausentes ou modelo antigo | Aumente `k`, confira prefixos, reingira os PDFs |
-| Primeira pergunta muito lenta para responder | Modelo de embeddings carregando/cache ainda não quente | Aguarde; em seguida as consultas ficam rápidas |
+| Resposta "não encontrei no contexto" | `TOP_K` baixo, prefixos ausentes ou PDF não ingerido | Ajuste `TOP_K`, confira os prefixos, reingira os PDFs |
+| Primeira pergunta muito lenta | Modelo de embeddings carregando/cache ainda não quente | Aguarde; as consultas seguintes ficam rápidas |
 | Erro de memória (Killed) | RAM insuficiente | Use máquina/container com 8 GB de RAM |
-| PDF com texto quebrado/símbolos estranhos | Extração padrão não entende a fonte/equação | Teste trocar o loader por `PyMuPDFLoader` ou aceite a inferência do modelo |
-| Coleção com vetores antigos | Troca de modelo sem reingestão | Apague a coleção e reenvie os PDFs |
+| PDF com texto quebrado/símbolos estranhos | Extração padrão não entende a fonte/equação | Aceite a limitação do PDF ou converta o arquivo para texto |
 
 ---
 
 ## 🔒 Segurança
 
 - **Nunca** versione o `.env`.
-- Em produção/VPS, exponha o Qdrant **apenas internamente** (não publique a porta `6333` publicamente).
+- Em produção/VPS, exponha o Qdrant **apenas internamente** (não publique a porta `6333`).
 - Adicione autenticação na interface antes de expor o Flask à internet.
 - Use HTTPS se for acessar fora da sua rede.
 
 ---
 
-## 📌 Resumo rápido de comandos
+## ⌨️ Comandos de linha de comando
 
 ```bash
-# Docker Compose
-cp .env.example .env
-docker compose up --build
+# Ingerir um PDF
+uv run python -m app.ingest caminho/arquivo.pdf
 
-# Execução local (com Qdrant separado)
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python app.py
+# Fazer uma pergunta
+uv run python -m app.query "sua pergunta"
 
-# Acesso
-http://localhost:5000
+# Recriar a coleção e reingerir todos os PDFs de data/pdfs
+uv run python -m app.reingest
 ```
+
+No Docker, troque `uv run python` por `docker compose run --rm app python`.
 
 ---
 
@@ -380,5 +266,5 @@ http://localhost:5000
 
 - Embeddings: [`intfloat/multilingual-e5-large`](https://huggingface.co/intfloat/multilingual-e5-large)
 - Banco vetorial: [Qdrant](https://qdrant.tech/)
-- Modelo de chat: DeepSeek Flash via [OpenCode](https://opencode.ai/)
+- Modelo de chat: DeepSeek Flash via [OpenCode Zen](https://opencode.ai/)
 - Orquestração: [LangChain](https://python.langchain.com/)
