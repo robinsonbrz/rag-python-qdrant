@@ -1,6 +1,7 @@
+# Segredos — NUNCA versione este arquivo
 .env
 
-
+# PDFs enviados e dados locais
 data/
 
 # Ambiente virtual e cache do Python
@@ -8,6 +9,11 @@ data/
 __pycache__/
 *.pyc
 
+# Cache local do modelo de embeddings (uso fora do Docker)
 .cache/
 
+# Dumps locais de modelos (gerados durante investigação)
+models*.txt
+
+# Padrões de sistema
 .DS_Store

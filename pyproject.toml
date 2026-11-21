@@ -1,0 +1,24 @@
+[project]
+name = "rag-estudos"
+version = "0.1.0"
+description = "Assistente de estudos com RAG usando LangChain, Qdrant e Flask"
+requires-python = ">=3.12"
+dependencies = [
+    "langchain>=0.3.0,<1.0",
+    "langchain-community>=0.3.0,<1.0",
+    "langchain-openai>=0.3.0,<1.0",
+    "langchain-huggingface>=0.2.0,<1.0",
+    "langchain-qdrant>=0.2.0,<1.0",
+    "langchain-text-splitters>=0.3.0,<1.0",
+    "qdrant-client>=1.12.0",
+    "pypdf>=5.1.0",
+    "sentence-transformers>=3.3.0",
+    "python-dotenv>=1.0.1",
+    "flask>=3.1.0,<4.0",
+    "markdown>=3.7,<4.0",
+]
+
+[tool.uv]
+# Não empacotamos/instalamos o projeto como biblioteca.
+# Usamos o uv apenas para gerenciar as dependências.
+package = false

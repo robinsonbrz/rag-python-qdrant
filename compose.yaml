@@ -1,0 +1,46 @@
+# ============================================================
+#  Docker Compose — define os dois contêineres do sistema:
+#   1) qdrant : banco de dados vetorial
+#   2) app    : aplicação Python (interface web + RAG)
+# ============================================================
+
+services:
+  # ----------------------------------------------------------------
+  # QDRANT — banco vetorial que guarda os "pedaços" dos PDFs já
+  # transformados em vetores (embeddings). Os dados ficam em um
+  # volume para sobreviverem a reinícios do contêiner.
+  # ----------------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"   # API REST — usada pela aplicação Python
+      - "6334:6334"   # gRPC — não usamos, mas é exposto por padrão
+    volumes:
+      - qdrant_data:/qdrant/storage
+    # Sem senha: adequado apenas para estudos em máquina local.
+    # Em produção, defina a variável QDRANT__SERVICE__API_KEY.
+
+  # ----------------------------------------------------------------
+  # APP — aplicação Python (Flask). Sobe a interface web na porta 5000.
+  # ----------------------------------------------------------------
+  app:
+    build: .
+    container_name: app-rag
+    depends_on:
+      - qdrant
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env           # carrega a chave da OpenCode Zen e demais configs
+    environment:
+      # Dentro da rede do Compose, o app alcança o Qdrant pelo NOME do
+      # serviço ("qdrant"), e não por "localhost".
+      QDRANT_URL: http://qdrant:6333
+    volumes:
+      - ./data:/app/data                      # PDFs enviados ficam no host
+      - hf_cache:/app/.cache/huggingface      # cache do modelo de embeddings
+
+volumes:
+  qdrant_data:
+  hf_cache:
