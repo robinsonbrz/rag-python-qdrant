@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Assistente de Estudos (RAG)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 780px; margin: 2rem auto; padding: 0 1rem; color: #1c2733; }
+    h1 { font-size: 1.6rem; }
+    section { background: #f5f7fa; border: 1px solid #dde3ea; border-radius: 10px; padding: 1.2rem; margin: 1.2rem 0; }
+    label { display: block; font-weight: 600; margin: .35rem 0; }
+    textarea { width: 100%; min-height: 90px; padding: .6rem; border: 1px solid #c3cdd9; border-radius: 6px; font: inherit; }
+    input[type=file] { font: inherit; }
+    button { background: #2563eb; color: #fff; border: 0; padding: .55rem 1.1rem; border-radius: 6px; cursor: pointer; font: inherit; }
+    button:hover { background: #1d4ed8; }
+    .flash { padding: .6rem .9rem; border-radius: 6px; margin: .6rem 0; }
+    .flash.ok { background: #dcfce7; color: #14532d; }
+    .flash.erro { background: #fee2e2; color: #7f1d1d; }
+    .resposta { background: #fff; border: 1px solid #dde3ea; border-radius: 8px; padding: 1rem; line-height: 1.6; }
+    .resposta h1, .resposta h2, .resposta h3 { margin-top: 1rem; }
+    .resposta p { margin: .5rem 0; }
+    .resposta ul, .resposta ol { padding-left: 1.5rem; }
+    .resposta code { background: #eef2f7; padding: .15rem .35rem; border-radius: 4px; font-family: ui-monospace, monospace; }
+    .resposta pre { background: #0f172a; color: #e2e8f0; padding: 1rem; border-radius: 8px; overflow-x: auto; }
+    .resposta pre code { background: none; padding: 0; color: inherit; }
+    .resposta blockquote { border-left: 3px solid #cbd5e1; margin: .6rem 0; padding-left: .8rem; color: #475569; }
+    .resposta table { border-collapse: collapse; margin: .6rem 0; }
+    .resposta th, .resposta td { border: 1px solid #cbd5e1; padding: .4rem .6rem; }
+    .resposta a { color: #2563eb; }
+
+  </style>
+</head>
+<body>
+  <h1>📚 Assistente de Estudos (RAG)</h1>
+  <p>Envie um PDF e depois faça perguntas sobre o conteúdo dele.</p>
+
+  {% with mensagens = get_flashed_messages(with_categories=true) %}
+    {% for categoria, msg in mensagens %}
+      <div class="flash {{ categoria }}">{{ msg }}</div>
+    {% endfor %}
+  {% endwith %}
+
+  <section>
+    <h2>1. Ingerir PDF</h2>
+    <form method="post" action="/ingest" enctype="multipart/form-data">
+      <label for="arquivo">Selecione um PDF com texto:</label>
+      <input type="file" id="arquivo" name="arquivo" accept=".pdf" required>
+      <br><br>
+      <button type="submit">Enviar e processar</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>2. Fazer pergunta</h2>
+    <form method="post" action="/ask">
+      <label for="pergunta">Pergunta:</label>
+      <textarea id="pergunta" name="pergunta" placeholder="Ex.: Explique o conceito de ..." required>{{ pergunta or "" }}</textarea>
+      <br>
+      <label><input type="checkbox" name="referencias"> Incluir referências (arquivo/página)</label>
+      <br><br>
+      <button type="submit">Perguntar</button>
+    </form>
+
+    {% if resposta_html %}
+      <h3>Resposta</h3>
+      <!-- O filtro |safe permite renderizar o HTML gerado pelo Markdown -->
+      <div class="resposta">{{ resposta_html|safe }}</div>
+    {% endif %}
+
+  </section>
+</body>
+</html>
